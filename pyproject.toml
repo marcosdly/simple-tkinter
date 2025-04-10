@@ -5,3 +5,55 @@ description = "Simple and nice wrapper around tkinter for every non-EOL python v
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
+
+[tool.ruff]
+builtins = ["_", "__"]
+cache-dir = "./.cache/ruff"
+indent-width = 4
+line-length = 88
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"
+quote-style = "double"
+
+[tool.pyright]
+reportExplicitAny = false
+reportAny = false
+pythonVersion = "3.9"
+strictDictionaryInference = true
+strictListInference = true
+strictSetInference = true
+enableTypeIgnoreComments = true
+reportImplicitOverride = false
+reportUninitializedInstanceVariable = false
+reportUnnecessaryIsInstance = false
+reportUnreachable = false
+reportIncompatibleMethodOverride = false
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.isort]
+case-sensitive = false
+combine-as-imports = true
+from-first = false
+length-sort = true
+lines-after-imports = 2
+lines-between-types = 1
+split-on-trailing-comma = false
+order-by-type = true
+required-imports = ["from __future__ import annotations"]
+default-section = "third-party"
+known-first-party = ["simple-tkinter"]
+section-order = [
+  "future",
+  "testing",
+  "first-party",
+  "local-folder",
+  "third-party",
+  "standard-library",
+]
+
+[tool.ruff.lint.isort.sections]
+testing = ["pytest"]
