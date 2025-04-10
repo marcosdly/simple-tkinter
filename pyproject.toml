@@ -1,0 +1,7 @@
+[project]
+name = "simple-tkinter"
+version = "0.0.1"
+description = "Simple and nice wrapper around tkinter for every non-EOL python version"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
