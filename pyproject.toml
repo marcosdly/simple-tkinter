@@ -20,7 +20,6 @@ quote-style = "double"
 [tool.pyright]
 reportExplicitAny = false
 reportAny = false
-pythonVersion = "3.9"
 strictDictionaryInference = true
 strictListInference = true
 strictSetInference = true
@@ -30,6 +29,10 @@ reportUninitializedInstanceVariable = false
 reportUnnecessaryIsInstance = false
 reportUnreachable = false
 reportIncompatibleMethodOverride = false
+
+[[tool.pyright.executionEnvironments]]
+root = "."
+pythonVersion = "3.9"
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
