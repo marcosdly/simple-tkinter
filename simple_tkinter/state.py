@@ -13,12 +13,11 @@ class State(StateMapping):
     call_when: dict[str, EventStateByValue]
     call_if: dict[StateMapping, StateEventCallable]
 
-    def __new__(cls, parent_id: UUID):
-        self = super(cls, State).__new__(cls)
-        self.parent_id = parent_id
+    def __init__(self, parent_instance_id: UUID):
+        super().__init__()
+        self.parent_id = parent_instance_id
         self.call_when = {}
         self.call_if = {}
-        return self
 
     def __setitem__(self, name: str, value: Hashable):
         super()[name] = value
