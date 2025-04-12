@@ -9,6 +9,7 @@ from typing import (
     Any,
     Union,
     Generic,
+    Literal,
     TypeVar,
     Callable,
     NamedTuple,
@@ -84,6 +85,34 @@ ES = TypeVar("ES", bound=NamedTuple)
 
 
 class EventValueUnknown(UniqueSymbolValue): ...
+
+
+KeyboardKeyState = Literal["pressed", "held", "released"]
+
+
+class KeyboardEventState(NamedTuple):
+    locale: str
+    layout: str
+    key_actioned: str
+    key_state: KeyboardKeyState
+    key_actioned_previous: str
+    key_state_previous: KeyboardKeyState
+
+
+MouseButtonState = Literal["pressed", "held", "released"]
+
+
+class MouseEventState(NamedTuple):
+    x: int
+    y: int
+    vec2d: tuple[int, int]
+    x_previous: int
+    y_previous: int
+    vec2d_previous: tuple[int, int]
+    button_actioned: int
+    button_state: MouseButtonState
+    button_actioned_previous: int
+    button_state_previous: MouseButtonState
 
 
 class EventCallState(Generic[ES], NamedTuple):
