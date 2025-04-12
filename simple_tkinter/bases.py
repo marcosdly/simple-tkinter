@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from uuid import UUID
-from typing import TYPE_CHECKING, Union, cast
+from typing import TYPE_CHECKING, Union, cast, NamedTuple, TypeVar, Generic, Any, Callable
 from collections.abc import Iterable
+from simple_tkinter.types import UniqueSymbolValue
 
 
 if TYPE_CHECKING:
@@ -65,3 +66,59 @@ class HasChildren:
                 ) from err
             for sub_widget in _iterable:
                 self.append_child(sub_widget)
+
+ES = TypeVar("ES", bound=NamedTuple)
+
+class EventValueUnknown(UniqueSymbolValue): ...
+
+class EventCallState(Generic[ES], NamedTuple):
+    event_name: str
+    event_global_count: int
+    event_data: Union[EventValueUnknown, Any]
+    event_state: ES
+    caller_widget: "Widget"
+    target_current:"Widget"
+    target_current_is_self: bool
+    target_by_id: Union["Widget", None]
+    target_by_class: tuple["Widget", ...]
+
+EventCallback = Callable[[EventCallState[ES]], Any]
+
+class EventRegistry(dict[str, EventCallback[ES]]):
+    def __init__(self, mapping: dict[str, EventCallback[ES]], *, frozen:bool=False):
+        super().__init__()
+        for name, func in mapping.items():
+            self[name] = func
+        self._frozen: bool = frozen
+
+    def __getitem__(self, name: str):
+        if self._frozen:
+            raise KeyError('object is frozen and can not be modified')
+        return super()[name]
+
+    def __setitem__(self, name: str, callback: EventCallback[ES]):
+        if self._frozen:
+            raise KeyError('object is frozen and can not be modified')
+        if not callable(callback):
+            raise TypeError('event callback must be callable')
+        super()[name] = callback
+
+    def __delitem__(self, name: str):
+        if self._frozen:
+            raise KeyError('object is frozen and can not be modified')
+        del super()[name]
+
+class HasEvents:
+    events_reserved: EventRegistry[Any]
+    events: EventRegistry[Any]
+
+    def __init__(self):
+        if hasattr(self, "reserved_events"):
+            self.events_reserved = EventRegistry(self.events_reserved, frozen=True)
+        else:
+            self.events_reserved = EventRegistry({}, frozen=True)
+        if hasattr(self,"events"):
+            self.events = EventRegistry(self.events)
+        else:
+            self.events = EventRegistry({})
+
