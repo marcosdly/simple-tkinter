@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from typing import Union, cast, Any
+from typing import Any, Union, cast
 from argparse import Namespace, ArgumentParser
 
+
+OptionDict = dict[str, Union[str, float]]
+LayoutChild = dict[str, Union[OptionDict, list["LayoutChild"]]]
+TkLayoutDefinition = list[tuple[str, LayoutChild]]
+ParsedLayoutStyle = list[LayoutChild]
 
 std_styles = [
     "TButton",
@@ -64,7 +69,7 @@ def command_list(args: Namespace):
         exit(0)
 
     if args.command == "options":
-        all_options: dict[str, dict[str, Union[str, float]]] = {
+        all_options: dict[str, OptionDict] = {
             element: {
                 option: s.lookup(element, option)  # type: ignore[reportUnknownMemberType]
                 for option in cast(tuple[str, ...], s.element_options(element))  # type: ignore[reportUnknownMemberType]
@@ -77,10 +82,45 @@ def command_list(args: Namespace):
 
     if args.command == "layouts":
         all_layouts: dict[str, list[Any]] = {
-            style: s.layout(style) for style in std_styles
+            style: s.layout(style)  # type: ignore[reportUnknownMemberType]
+            for style in std_styles
         }
 
         print(json_dump(all_layouts))
+        exit(0)
+
+    if args.command == "settings":
+
+        def make_style_settings(layout_def: TkLayoutDefinition) -> ParsedLayoutStyle:
+            settings_collection: ParsedLayoutStyle = []
+            for element, settings in layout_def:
+                options: OptionDict = {
+                    option: cast(Union[str, float], s.lookup(element, option))  # type: ignore[reportUnknownMemberType]
+                    for option in cast(tuple[str, ...], s.element_options(element))  # type: ignore[reportUnknownMemberType]
+                }
+                children: Union[TkLayoutDefinition, None] = settings.pop(
+                    "children", None
+                )  # type: ignore[reportAssignmentType]
+                settings_collection.append(
+                    {  # type: ignore[reportArgumentType]
+                        "name": element,
+                        "options": options,
+                        "layout": settings,
+                        "children": make_style_settings(children)
+                        if children is not None
+                        else [],
+                    }
+                )
+            return settings_collection
+
+        all_layout_settings = {
+            layout_name: make_style_settings(
+                cast(TkLayoutDefinition, s.layout(layout_name))  # type: ignore[reportUnknownMemberType]
+            )
+            for layout_name in std_styles
+        }
+
+        print(json_dump(all_layout_settings))
         exit(0)
 
 
@@ -92,7 +132,8 @@ def main():
 
     list_subparser = subparsers_factory.add_parser("list")
     _ = list_subparser.add_argument(
-        "command", choices=["themes", "elements", "options", "class", "layouts"]
+        "command",
+        choices=["themes", "elements", "options", "class", "layouts", "settings"],
     )
     _ = list_subparser.add_argument("--json", action="store_true")
     _ = list_subparser.add_argument("--theme", default="default")
