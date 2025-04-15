@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Union, cast
+import typing
+
+from typing import TYPE_CHECKING, Any, Union, cast
 from argparse import Namespace, ArgumentParser
+from collections.abc import Iterable
+
+
+if TYPE_CHECKING:
+    from tkinter import ttk
 
 
 OptionDict = dict[str, Union[str, float]]
@@ -33,6 +40,24 @@ std_styles = [
 ]
 
 
+def replace_empty_string(strings: Iterable[str]) -> list[str]:
+    _copy = list(strings)
+    try:
+        i = _copy.index("")
+        _copy[i] = "<empty string>"
+    except ValueError:
+        pass
+    return _copy
+
+
+@typing.no_type_check
+def get_options_for_element(s: "ttk.Style", element_name: str) -> OptionDict:
+    return {
+        option: s.lookup(element_name, option)
+        for option in s.element_options(element_name)
+    }
+
+
 def json_dump(obj: object):
     import json
 
@@ -47,7 +72,7 @@ def command_list(args: Namespace):
     from tkinter import ttk
 
     s = ttk.Style(None)
-    theme_names = s.theme_names()
+    theme_names = replace_empty_string(s.theme_names())
 
     if args.command == "themes":
         print(json_dump(theme_names) if args.json else "\n".join(theme_names))
@@ -62,7 +87,7 @@ def command_list(args: Namespace):
         exit(1)
 
     s.theme_use(theme_selected)
-    element_names = cast(tuple[str, ...], s.element_names())  # type: ignore[reportUnknownMemberType]
+    element_names = replace_empty_string(cast(tuple[str, ...], s.element_names()))  # type: ignore[reportUnknownMemberType]
 
     if args.command == "elements":
         print(json_dump(element_names) if args.json else "\n".join(element_names))
@@ -70,11 +95,7 @@ def command_list(args: Namespace):
 
     if args.command == "options":
         all_options: dict[str, OptionDict] = {
-            element: {
-                option: s.lookup(element, option)  # type: ignore[reportUnknownMemberType]
-                for option in cast(tuple[str, ...], s.element_options(element))  # type: ignore[reportUnknownMemberType]
-            }
-            for element in element_names
+            element: get_options_for_element(s, element) for element in element_names
         }
 
         print(json_dump(all_options))
@@ -94,10 +115,7 @@ def command_list(args: Namespace):
         def make_style_settings(layout_def: TkLayoutDefinition) -> ParsedLayoutStyle:
             settings_collection: ParsedLayoutStyle = []
             for element, settings in layout_def:
-                options: OptionDict = {
-                    option: cast(Union[str, float], s.lookup(element, option))  # type: ignore[reportUnknownMemberType]
-                    for option in cast(tuple[str, ...], s.element_options(element))  # type: ignore[reportUnknownMemberType]
-                }
+                options: OptionDict = get_options_for_element(s, element)
                 children: Union[TkLayoutDefinition, None] = settings.pop(
                     "children", None
                 )  # type: ignore[reportAssignmentType]
