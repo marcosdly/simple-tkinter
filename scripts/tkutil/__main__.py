@@ -4,6 +4,30 @@ from typing import Union, cast
 from argparse import Namespace, ArgumentParser
 
 
+std_styles = [
+    "TButton",
+    "TCheckbutton",
+    "TCombobox",
+    "TEntry",
+    "TFrame",
+    "TLabel",
+    "TLabelFrame",
+    "TMenubutton",
+    "TNotebook",
+    "TPanedwindow",
+    "Horizontal.TProgressbar",
+    "Vertical.TProgressbar",
+    "TRadiobutton",
+    "Horizontal.TScale",
+    "Vertical.TScale",
+    "Horizontal.TScrollbar",
+    "Vertical.TScrollbar",
+    "TSeparator",
+    "TSizegrip",
+    "Treeview",
+]
+
+
 def json_dump(obj: object):
     import json
 
@@ -11,6 +35,10 @@ def json_dump(obj: object):
 
 
 def command_list(args: Namespace):
+    if args.command == "class":
+        print(json_dump(std_styles) if args.json else "\n".join(std_styles))
+        exit(0)
+
     from tkinter import ttk
 
     s = ttk.Style(None)
@@ -56,7 +84,7 @@ def main():
 
     list_subparser = subparsers_factory.add_parser("list")
     _ = list_subparser.add_argument(
-        "command", choices=["themes", "elements", "options"]
+        "command", choices=["themes", "elements", "options", "class"]
     )
     _ = list_subparser.add_argument("--json", action="store_true")
     _ = list_subparser.add_argument("--theme", default="default")
