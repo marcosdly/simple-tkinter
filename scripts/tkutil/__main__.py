@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Union, cast
+from typing import Union, cast, Any
 from argparse import Namespace, ArgumentParser
 
 
@@ -11,7 +11,7 @@ std_styles = [
     "TEntry",
     "TFrame",
     "TLabel",
-    "TLabelFrame",
+    "TLabelframe",
     "TMenubutton",
     "TNotebook",
     "TPanedwindow",
@@ -63,16 +63,24 @@ def command_list(args: Namespace):
         print(json_dump(element_names) if args.json else "\n".join(element_names))
         exit(0)
 
-    all_options: dict[str, dict[str, Union[str, float]]] = {
-        element: {
-            option: s.lookup(element, option)  # type: ignore[reportUnknownMemberType]
-            for option in cast(tuple[str, ...], s.element_options(element))  # type: ignore[reportUnknownMemberType]
-        }
-        for element in element_names
-    }
-
     if args.command == "options":
+        all_options: dict[str, dict[str, Union[str, float]]] = {
+            element: {
+                option: s.lookup(element, option)  # type: ignore[reportUnknownMemberType]
+                for option in cast(tuple[str, ...], s.element_options(element))  # type: ignore[reportUnknownMemberType]
+            }
+            for element in element_names
+        }
+
         print(json_dump(all_options))
+        exit(0)
+
+    if args.command == "layouts":
+        all_layouts: dict[str, list[Any]] = {
+            style: s.layout(style) for style in std_styles
+        }
+
+        print(json_dump(all_layouts))
         exit(0)
 
 
@@ -84,7 +92,7 @@ def main():
 
     list_subparser = subparsers_factory.add_parser("list")
     _ = list_subparser.add_argument(
-        "command", choices=["themes", "elements", "options", "class"]
+        "command", choices=["themes", "elements", "options", "class", "layouts"]
     )
     _ = list_subparser.add_argument("--json", action="store_true")
     _ = list_subparser.add_argument("--theme", default="default")
