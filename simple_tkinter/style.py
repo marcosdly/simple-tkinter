@@ -2,11 +2,30 @@ from __future__ import annotations
 
 from simple_tkinter.constants import Direction
 
-import os
 import io
-from pathlib import Path
+import os
+import copy
+import json
+import uuid
+import contextvars
 
-from typing import Union, Literal, TypeVar, Callable, TypedDict, NamedTuple
+from typing import (
+    Any,
+    Final,
+    Union,
+    Literal,
+    TypeVar,
+    Callable,
+    Optional,
+    TypedDict,
+    NamedTuple,
+    cast,
+    final,
+)
+from pathlib import Path
+from contextvars import Context, ContextVar
+from dataclasses import field, asdict, dataclass
+from collections.abc import Mapping
 
 
 VSAPI_IMPL_THEMES: tuple[str, ...] = (
@@ -17,6 +36,7 @@ Image = Union[str, Path, bytes, bytearray, io.BytesIO]
 Color = str
 Size = float
 
+
 class Font(TypedDict, total=False):
     family: str
     size: Size
@@ -25,11 +45,29 @@ class Font(TypedDict, total=False):
     underline: bool
     strikethrough: bool
 
+
 class Spacing(NamedTuple):
     left: float = 0
     right: float = 0
     top: float = 0
     bottom: float = 0
+
+
+PropertyType = Union[
+    str,
+    int,
+    float,
+    bool,
+    Image,
+    Color,
+    Size,
+    Spacing,
+    Font,
+    None,
+    Callable[..., Any],
+    Final[str],
+    dict[str, "PropertyType"],
+]
 
 
 class StyleBorder(TypedDict, total=False):
@@ -44,7 +82,7 @@ class StyleText(TypedDict, total=False):
     font: Font
     foreground: Color
     underline: bool
-    justify: Literal['left', 'right', 'center', 'justify']
+    justify: Literal["left", "right", "center", "justify"]
     wrap: bool
     wrap_length: int
     wrap_break_at: Union[str, Callable[[str, int], int]]
@@ -141,6 +179,127 @@ class ElementStyleDefinition(TypedDict, total=True):
 
 StyleDefinition = OrderedSequence[ElementStyleDefinition]
 
+StyleObjectValue = Union[PropertyType, "Style"]
+
+
+@dataclass(frozen=True, unsafe_hash=True)
+class StyleObjectContext:
+    keytrace: ContextVar[tuple[str, ...]]
+    instance_chain_hash: int
+    context: Context
+
+    @classmethod
+    def make_default(cls):
+        ctx = Context()
+
+        def populate_context(*, running_context: Context):
+            return cls(
+                keytrace=ContextVar("keytrace", default=()),
+                instance_chain_hash=uuid.uuid4().int,
+                context=running_context,
+            )
+
+        return ctx.run(populate_context, running_context=ctx)
+
+
+StyleObjectEventCallback = Callable[[str, PropertyType, PropertyType], Any]
+
+
+@final
+class Style(Mapping[str, StyleObjectValue]):
+    def __init__(
+        self,
+        mapping: dict[str, PropertyType],
+        *,
+        context: Optional[StyleObjectContext] = None,
+        on_get_value: Optional[Callable[[str, StyleObjectValue], Any]] = None,
+        on_set_value: Optional[
+            Callable[[str, StyleObjectValue, StyleObjectValue], Any]
+        ] = None,
+    ):
+        self._on_get_value = on_get_value
+        self._on_set_value = on_set_value
+        self._ctx: StyleObjectContext = context or StyleObjectContext.make_default()
+
+        self._data: dict[str, StyleObjectValue] = {}
+        tmp_slots: list[str] = []
+        for k, v in mapping.items():
+            value: Union[StyleObjectValue, "Style"] = (
+                Style(
+                    cast(dict[str, PropertyType], v),
+                    context=self._ctx,
+                    on_get_value=self._on_get_value,
+                    on_set_value=self._on_set_value,
+                )
+                if isinstance(v, dict)
+                else v
+            )
+            self._data[k] = value
+            tmp_slots.append(k)
+
+        self.slots: tuple[str, ...] = tuple(tmp_slots)
+
+    def __getitem__(self, name: str):
+        if name not in self.slots:
+            raise KeyError(name)
+        value = self._data.__getitem__(name)
+        if isinstance(value, (dict, Style)):
+            updated_trace = self._ctx.keytrace.get() + (name,)
+            _ = self._ctx.keytrace.set(updated_trace)
+        else:
+            if self._on_get_value is not None:
+                self._ctx.context.run(self._on_get_value, name, value)
+            _ = self._ctx.keytrace.set(())
+        return value
+
+    def __setitem__(self, name: str, value: PropertyType):
+        if name not in self.slots:
+            raise KeyError(f"unknown key {name}")
+        previous_value = self._data.get(name, None)
+        if isinstance(previous_value, (dict, Style)):
+            raise TypeError("trying to assign key with value of type 'dict' or 'Style'")
+        self._data.__setitem__(name, value)
+        if self._on_set_value is not None:
+            self._ctx.context.run(self._on_set_value, name, previous_value, value)
+
+    def __iter__(self):
+        return self._data.__iter__()
+
+    def __len__(self):
+        return self._data.__len__()
+
+    def __contains__(self, name: str):
+        return self._data.__contains__(name)
+
+    def __eq__(self, other: Any):
+        return self._data.__eq__(other)
+
+    def __ne__(self, other: Any):
+        return self._data.__eq__(other)
+
+    def keys(self):
+        return self._data.keys()
+
+    def items(self):
+        return self._data.items()
+
+    def values(self):
+        return self._data.values()
+
+    def get(self, name: str, default: Optional[StyleObjectValue] = None):
+        return self._data.get(name, default)
+
+    def __deepcopy__(self):
+        return copy.deepcopy(self._data)
+
+    def __copy__(self):
+        return self.__deepcopy__()
+
+    def deepcopy(self):
+        return self.__deepcopy__()
+
+    def get_style_chain_hash(self) -> int:
+        return self._ctx.instance_chain_hash
+
 
 def style_factory(): ...
-
