@@ -34,9 +34,36 @@ VSAPI_IMPL_THEMES: tuple[str, ...] = (
     ("winnative", "vista", "xpnative") if os.name == "nt" else ()
 )
 
+# region Common types
+
+T = TypeVar("T")
+ElementType = Literal["outline", "label", "frame", "grid", "flexbox"]
+ElementPropertyType = Literal[
+    "border", "text", "background", "position", "size", "grid", "flexbox"
+]
+OrderedSequence = Union[list[T], tuple[T, ...]]
 Image = Union[str, Path, bytes, bytearray, io.BytesIO]
 Color = str
 Size = float
+PropertyType = Union[
+    str,
+    int,
+    float,
+    bool,
+    Image,
+    Color,
+    Size,
+    "Spacing",
+    "Font",
+    None,
+    Callable[..., Any],
+    Final[str],
+    dict[str, "PropertyType"],
+]
+
+# region Common types
+
+# region Font type and helpers
 
 
 class Font(TypedDict, total=False):
@@ -48,6 +75,11 @@ class Font(TypedDict, total=False):
     strikethrough: bool
 
 
+# endregion Font: type and helpers
+
+# region Spacing: type and helpers
+
+
 class Spacing(NamedTuple):
     left: float = 0
     right: float = 0
@@ -55,21 +87,10 @@ class Spacing(NamedTuple):
     bottom: float = 0
 
 
-PropertyType = Union[
-    str,
-    int,
-    float,
-    bool,
-    Image,
-    Color,
-    Size,
-    Spacing,
-    Font,
-    None,
-    Callable[..., Any],
-    Final[str],
-    dict[str, "PropertyType"],
-]
+# endregion Spacing: type and helpers
+
+
+# region TYPES: Style properties
 
 
 class StyleBorder(TypedDict, total=False):
@@ -119,13 +140,10 @@ class StyleFlexbox(TypedDict, total=False): ...
 class StyleGrid(TypedDict, total=False): ...
 
 
-T = TypeVar("T")
+# endregion TYPES: Style properties
 
-ElementType = Literal["outline", "label", "frame", "grid", "flexbox"]
-ElementPropertyType = Literal[
-    "border", "text", "background", "position", "size", "grid", "flexbox"
-]
-OrderedSequence = Union[list[T], tuple[T, ...]]
+
+# region TYPES: Primitive elements' style properties
 
 
 class OutlineElementProperties(TypedDict, total=False):
@@ -169,6 +187,11 @@ ElementTypeStyle = Union[
     GridElementProperties,
 ]
 
+# endregion TYPES: Primitive elements' style properties
+
+
+# region TYPES: Primitive elements' implementations
+
 
 class ElementStyleDefinition(TypedDict, total=True):
     element_type: ElementType
@@ -178,6 +201,10 @@ class ElementStyleDefinition(TypedDict, total=True):
     style_can_edit: dict[ElementPropertyType, Union[bool, dict[str, bool]]]
     children: StyleDefinition
 
+
+# endregion TYPES: Primitive elements' implementations
+
+# region Style object (mapping) implementation
 
 StyleDefinition = OrderedSequence[ElementStyleDefinition]
 
@@ -314,6 +341,9 @@ class Style(Mapping[str, StyleObjectValue]):
 
     def get_style_chain_hash(self) -> int:
         return self._ctx.instance_chain_hash
+
+
+# endregion Style object (mapping) implementation
 
 
 def style_factory(): ...
