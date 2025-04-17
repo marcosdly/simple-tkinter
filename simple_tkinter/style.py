@@ -7,6 +7,7 @@ import os
 import copy
 import json
 import uuid
+import numbers
 import tkinter as tk
 import itertools
 import contextvars
@@ -16,6 +17,7 @@ from typing import (
     Any,
     Final,
     Union,
+    Generic,
     Literal,
     TypeVar,
     Callable,
@@ -55,7 +57,7 @@ PropertyType = Union[
     Image,
     Color,
     Size,
-    "Spacing",
+    "Spacing[int]",
     "Font",
     None,
     Callable[..., Any],
@@ -99,26 +101,34 @@ class Font(TypedDict, total=False):
 
 # endregion Font: type and helpers
 
-# region Spacing: type and helpers
+# region Spacing
+
+NT = TypeVar("NT", int, float)
 
 
-class Spacing(NamedTuple):
-    left: float = 0
-    right: float = 0
-    top: float = 0
-    bottom: float = 0
+@final
+class Spacing(Generic[NT], NamedTuple):
+    __ZERO = cast(NT, 0)
+
+    left: NT = __ZERO
+    right: NT = __ZERO
+    top: NT = __ZERO
+    bottom: NT = __ZERO
 
     @classmethod
-    def equal_horizontal(cls, size: float) -> Spacing: ...
+    def equal_horizontal(cls, size: NT):
+        return cls(left=size, right=size)
 
     @classmethod
-    def equal_vertical(cls, size: float) -> Spacing: ...
+    def equal_vertical(cls, size: NT):
+        return cls(top=size, bottom=size)
 
     @classmethod
-    def equal_around(cls, size: float) -> Spacing: ...
+    def equal_around(cls, size: NT):
+        return cls(size, size, size, size)
 
 
-# endregion Spacing: type and helpers
+# endregion Spacing
 
 
 # region TYPES: Style properties
@@ -161,8 +171,8 @@ class StyleSize(TypedDict, total=False):
 
 
 class StyleSpacing(TypedDict, total=False):
-    padding: Spacing
-    margin: Spacing
+    padding: Spacing[int]
+    margin: Spacing[int]
 
 
 class StyleFlexbox(TypedDict, total=False): ...
