@@ -7,8 +7,10 @@ import os
 import copy
 import json
 import uuid
+import tkinter as tk
 import itertools
 import contextvars
+import tkinter.font as tk_font
 
 from typing import (
     Any,
@@ -61,7 +63,7 @@ PropertyType = Union[
     dict[str, "PropertyType"],
 ]
 
-# region Common types
+# endregion Common types
 
 # region Font type and helpers
 
@@ -73,6 +75,26 @@ class Font(TypedDict, total=False):
     bold: bool
     underline: bool
     strikethrough: bool
+
+    @classmethod
+    def get_standard_font(
+        cls, alias: Literal["sans", "serif", "monospace"]
+    ) -> Font: ...  # type: ignore[reportGeneralTypeIssues]
+
+    @classmethod
+    def get_families(cls) -> tuple[str, ...]: ...  # type: ignore[reportGeneralTypeIssues]
+
+    @classmethod
+    def get_sub_families(cls) -> dict[str, tuple[str, ...]]: ...  # type: ignore[reportGeneralTypeIssues]
+
+    @classmethod
+    def get_files(cls) -> dict[str, Path]: ...  # type: ignore[reportGeneralTypeIssues]
+
+    @classmethod
+    def get_by_name(cls, font_name: str) -> Font: ...  # type: ignore[reportGeneralTypeIssues]
+
+    @classmethod
+    def create_font_as_config_alias(cls, new_alias: str, font_config: Font): ...  # type: ignore[reportGeneralTypeIssues]
 
 
 # endregion Font: type and helpers
