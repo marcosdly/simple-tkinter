@@ -7,6 +7,7 @@ import os
 import copy
 import json
 import uuid
+import itertools
 import contextvars
 
 from typing import (
@@ -21,6 +22,7 @@ from typing import (
     NamedTuple,
     cast,
     final,
+    overload,
 )
 from pathlib import Path
 from contextvars import Context, ContextVar
@@ -289,8 +291,20 @@ class Style(Mapping[str, StyleObjectValue]):
     def get(self, name: str, default: Optional[StyleObjectValue] = None):
         return self._data.get(name, default)
 
+    def update(
+        self, mapping: dict[str, StyleObjectValue], /, **kwargs: StyleObjectValue
+    ):
+        changed: set[str] = set()
+        # prefer kwargs
+        for k, v in itertools.chain(kwargs.items(), mapping.items()):
+            if k in changed:
+                continue
+            value = copy.deepcopy(v) if isinstance(v, (dict, Style)) else v
+            changed.add(k)
+            self.__setitem__(k, cast(dict[str, PropertyType], value))
+
     def __deepcopy__(self):
-        return copy.deepcopy(self._data)
+        return cast(dict[str, PropertyType], copy.deepcopy(self._data))
 
     def __copy__(self):
         return self.__deepcopy__()
