@@ -108,6 +108,15 @@ class Spacing(NamedTuple):
     top: float = 0
     bottom: float = 0
 
+    @classmethod
+    def equal_horizontal(cls, size: float) -> Spacing: ...
+
+    @classmethod
+    def equal_vertical(cls, size: float) -> Spacing: ...
+
+    @classmethod
+    def equal_around(cls, size: float) -> Spacing: ...
+
 
 # endregion Spacing: type and helpers
 
