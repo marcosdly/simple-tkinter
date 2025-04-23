@@ -39,6 +39,16 @@ VSAPI_IMPL_THEMES: tuple[str, ...] = (
     ("winnative", "vista", "xpnative") if os.name == "nt" else ()
 )
 
+_tk_inited: bool = False
+
+
+def _ensure_tk():
+    global _tk_inited
+    if not _tk_inited:
+        _ = tk.Tcl(useTk=True)
+        _tk_inited = True
+
+
 # region Common types
 
 T = TypeVar("T")
