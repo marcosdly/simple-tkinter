@@ -2,16 +2,18 @@ from __future__ import annotations
 
 from simple_tkinter.constants import Direction
 
+from fontTools.ttLib.ttFont import TTFont
+from find_system_fonts_filename import get_system_fonts_filename
+from fontTools.ttLib.tables._n_a_m_e import table__n_a_m_e as TTFontTableName
+
 import io
 import os
 import copy
-import json
 import math
 import uuid
-import numbers
+import string
 import tkinter as tk
 import itertools
-import contextvars
 import tkinter.font as tk_font
 
 from typing import (
@@ -27,11 +29,10 @@ from typing import (
     NamedTuple,
     cast,
     final,
-    overload,
 )
 from pathlib import Path
 from contextvars import Context, ContextVar
-from dataclasses import field, asdict, dataclass
+from dataclasses import dataclass
 from collections.abc import Mapping
 
 
@@ -79,33 +80,145 @@ PropertyType = Union[
 # region Font type and helpers
 
 
+@dataclass(init=False, frozen=False)
+class _FontCache:
+    ever_loaded: bool = False
+    families_unique: tuple[str, ...] = ()
+    files: tuple[Path, ...] = ()
+    font_cache: tuple["_FontStruct", ...] = ()
+    default_sans: Optional["_FontStruct"] = None
+    default_serif: Optional["_FontStruct"] = None
+    default_monospace: Optional["_FontStruct"] = None
+
+    default_family: dict[str, tuple[str, ...]]
+    if os.name == "nt":
+        default_family = {
+            "sans": ("Arial",),
+            "serif": ("Times New Roman",),
+            "monospace": ("Consolas",),
+        }
+    else:
+        default_family = {
+            "sans": (),
+            "serif": (),
+            "monospace": (),
+        }
+
+    @classmethod
+    def refresh_cache(cls):
+        # SEE OpenType spec: https://learn.microsoft.com/en-us/typography/opentype/spec/otff
+        # SEE TTFont docs: https://fonttools.readthedocs.io/en/latest/ttLib/ttFont.html#fontTools.ttLib.ttFont.TTFont
+
+        _ensure_tk()
+        tk_families = tk_font.families(None)
+        files: set[Path] = set()
+        _fonts: set[_FontStruct] = set()
+        _families: set[str] = set()
+        for _path in get_system_fonts_filename():
+            p = Path(_path).absolute()
+            if not (p.exists() and p.is_file()):
+                continue
+            ttf = TTFont(file=_path, lazy=False)
+            if not ttf.has_key("name"):  # type: ignore[reportUnknownMemberType]
+                continue
+            name = cast(TTFontTableName, ttf["name"])
+            family_name = cast(Optional[str], name.getBestFamilyName())
+            if family_name is None:
+                continue
+            family_name = family_name.strip(string.whitespace)
+            if family_name not in tk_families:
+                continue
+            _families.add(family_name)
+            _sub_family = cast(str, name.getBestSubFamilyName() or "Regular")
+            sub_family_tuple = tuple(
+                _str.strip(string.whitespace).lower()
+                for _str in _sub_family.strip(string.whitespace).split(" ")
+            )
+            font_struct = _FontStruct(
+                family=family_name,
+                sub_family=sub_family_tuple,
+                file=p,
+                font_object=ttf,
+            )
+            _fonts.add(font_struct)
+            if cls.default_sans is None and family_name in cls.default_family["sans"]:
+                cls.default_sans = font_struct
+            if cls.default_serif is None and family_name in cls.default_family["serif"]:
+                cls.default_serif = font_struct
+            if (
+                cls.default_monospace is None
+                and family_name in cls.default_family["monospace"]
+            ):
+                cls.default_monospace = font_struct
+
+        cls.families_unique = tuple(_families)
+        cls.files = tuple(files)
+        cls.font_cache = tuple(_fonts)
+
+        if not cls.ever_loaded:
+            cls.ever_loaded = True
+
+
+@dataclass(init=True, frozen=True, unsafe_hash=True)
+class _FontStruct:
+    family: str
+    sub_family: tuple[str, ...]
+    file: Path
+    font_object: TTFont
+
+    def get_default_font_dict(self) -> "Font":
+        _weight: str
+        if "bold" in self.sub_family:
+            _weight = "bold"
+        elif "semibold" in self.sub_family:
+            _weight = "semibold"
+        else:
+            _weight = "normal"
+        return Font(
+            family=self.family,
+            size=SizeAbsolute(10, "px"),
+            weight=_weight,
+            italic="italic" in self.sub_family,
+            underline=False,
+            strikethrough=False,
+        )
+
+
 class Font(TypedDict, total=False):
     family: str
     size: Size
+    weight: Literal["normal", "bold", "semibold"]
     italic: bool
-    bold: bool
     underline: bool
     strikethrough: bool
 
     @classmethod
-    def get_standard_font(
-        cls, alias: Literal["sans", "serif", "monospace"]
-    ) -> Font: ...  # type: ignore[reportGeneralTypeIssues]
+    def get_standard_font(cls, alias: Literal["sans", "serif", "monospace"]) -> Font:  # type: ignore[reportGeneralTypeIssues]
+        ...
 
     @classmethod
-    def get_families(cls) -> tuple[str, ...]: ...  # type: ignore[reportGeneralTypeIssues]
+    def get_families(cls) -> tuple[str, ...]:  # type: ignore[reportGeneralTypeIssues]
+        ...
 
     @classmethod
-    def get_sub_families(cls) -> dict[str, tuple[str, ...]]: ...  # type: ignore[reportGeneralTypeIssues]
+    def get_sub_families(cls) -> dict[str, tuple[str, ...]]:  # type: ignore[reportGeneralTypeIssues]
+        ...
 
     @classmethod
-    def get_files(cls) -> dict[str, Path]: ...  # type: ignore[reportGeneralTypeIssues]
+    def get_files(cls) -> dict[str, Path]:  # type: ignore[reportGeneralTypeIssues]
+        ...
 
     @classmethod
-    def get_by_name(cls, font_name: str) -> Font: ...  # type: ignore[reportGeneralTypeIssues]
+    def get_by_name(cls, font_name: str) -> Font:  # type: ignore[reportGeneralTypeIssues]
+        ...
 
     @classmethod
-    def create_font_as_config_alias(cls, new_alias: str, font_config: Font): ...  # type: ignore[reportGeneralTypeIssues]
+    def create_font_as_config_alias(cls, new_alias: str, font_config: Font):  # type: ignore[reportGeneralTypeIssues]
+        ...
+
+    @classmethod
+    def refresh_cache(cls):  # type: ignore[reportGeneralTypeIssues]
+        _FontCache.refresh_cache()
 
 
 # endregion Font: type and helpers
