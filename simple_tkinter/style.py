@@ -6,6 +6,7 @@ import io
 import os
 import copy
 import json
+import math
 import uuid
 import numbers
 import tkinter as tk
@@ -47,16 +48,14 @@ ElementPropertyType = Literal[
 ]
 OrderedSequence = Union[list[T], tuple[T, ...]]
 Image = Union[str, Path, bytes, bytearray, io.BytesIO]
-Color = str
-Size = float
 PropertyType = Union[
     str,
     int,
     float,
     bool,
     Image,
-    Color,
-    Size,
+    "Color",
+    "Size",
     "Spacing[int]",
     "Font",
     None,
@@ -130,6 +129,137 @@ class Spacing(Generic[NT], NamedTuple):
 
 # endregion Spacing
 
+# region Size
+
+Size = Union["SizeAbsolute", "SizeRelative"]
+
+
+@final
+class SizeAbsolute(NamedTuple):
+    value: float = 0
+    unit: Literal["px", "pt", "cm", "in", "mm"] = "px"
+
+
+@final
+class SizeRelative(NamedTuple):
+    value: float = 0
+    unit: Literal["percent", "part"] = "percent"
+    relative_to: Literal["widget", "id", "class"] = "widget"
+    identifier: str = "parent"
+
+
+# endregion Size
+
+# region Color
+
+
+class Color(str):
+    # SEE formulas sources: https://exceloffthegrid.com/convert-color-codes/
+    def __new__(cls, hex_value: str) -> Color:
+        hex_value = hex_value.strip("#")
+        _len = len(hex_value)
+        if _len == 0:
+            raise ValueError("hex string length is zero")
+        for char in hex_value:
+            if char not in "0123456789abcdef":
+                raise ValueError(f"invalid hex character: '{char}' in {hex_value}")
+        value: str
+        if _len == 1:
+            value = hex_value * 6
+        elif _len == 2:
+            value = hex_value * 3
+        elif _len == 3:
+            value = hex_value * 2
+        elif _len == 6:
+            value = hex_value
+        else:
+            raise ValueError(f"hex string length must be up to 6 but got {_len}")
+        return super(Color, cls).__new__(cls, "#" + value)
+
+    @classmethod
+    def rgb(cls, r: int, g: int, b: int) -> Color:
+        def clamp(n: int) -> int:
+            return min(max(n, 0), 255)
+
+        return cls.int(clamp(b) * 256**2 + clamp(g) * 256 + clamp(r))
+
+    @classmethod
+    def hsl(cls, hue: int, sat: float, lum: float) -> Color:
+        if sat == 0:
+            gray_shade: int = max(math.floor(lum * 255), 255)
+            return cls.rgb(gray_shade, gray_shade, gray_shade)
+
+        temp1: float
+        if lum < 0.5:
+            temp1 = lum * (sat + 1)
+        else:
+            temp1 = lum + sat - lum * sat
+        temp2: float = 2 * lum - temp1
+        hue_adjusted: float = hue / 360
+
+        def color_temperature(temp: float) -> float:
+            if temp < 0:
+                return temp + 1
+            elif temp > 1:
+                return temp - 1
+            else:
+                return temp
+
+        temp_r = color_temperature(hue_adjusted + 0.333)
+        temp_g = color_temperature(hue_adjusted)
+        temp_b = color_temperature(hue_adjusted - 0.333)
+
+        def rgb_factor(temp: float) -> float:
+            if temp * 6 < 1:
+                return temp2 + (temp1 - temp2) * 6 * temp
+            elif temp * 2 < 1:
+                return temp1
+            elif temp * 3 < 2:
+                return temp2 + (temp1 - temp2) * (0.666 - temp) * 6
+            else:
+                return temp2
+
+        def rgb_value(temp: float) -> int:
+            return math.floor(rgb_factor(temp) * 255)
+
+        return cls.rgb(rgb_value(temp_r), rgb_value(temp_g), rgb_value(temp_b))
+
+    @classmethod
+    def int(cls, n: int) -> Color:
+        return Color(hex(n)[2:].ljust(6, "0"))
+
+    @classmethod
+    def hsv(cls, hue: float, sat: float, val: float) -> Color:
+        c: float = sat * val
+        x: float = c * (1 - abs(hue / 60 - 2 * math.floor(hue / 60 / 2) - 1))
+        m: float = val - c
+
+        def rgb_value(n: float) -> int:
+            return math.floor((math.floor(n) + m) * 255)
+
+        if 0 <= hue < 60:
+            return cls.rgb(rgb_value(c), rgb_value(x), 0)
+        elif 60 <= hue < 120:
+            return cls.rgb(rgb_value(x), rgb_value(c), 0)
+        elif 120 <= hue < 180:
+            return cls.rgb(0, rgb_value(c), rgb_value(x))
+        elif 180 <= hue < 240:
+            return cls.rgb(0, rgb_value(x), rgb_value(c))
+        elif 240 <= hue < 300:
+            return cls.rgb(rgb_value(x), 0, rgb_value(c))
+        else:
+            return cls.rgb(rgb_value(c), 0, rgb_value(x))
+
+    @classmethod
+    def cmyk(cls, c: float, m: float, y: float, k: float) -> Color:
+        return cls.rgb(
+            math.floor(255 * (1 - k) * (1 - c)),
+            math.floor(255 * (1 - k) * (1 - m)),
+            math.floor(255 * (1 - k) * (1 - y)),
+        )
+
+
+# endregion Color
 
 # region TYPES: Style properties
 
