@@ -81,6 +81,14 @@ PropertyType = Union[
 # region Font type and helpers
 
 
+@dataclass(init=True, frozen=True)
+class _FontAlias:
+    name: str
+    font_struct: _FontStruct
+    font_dict: Font
+    font_tk_object: tk_font.Font
+
+
 @dataclass(init=False, frozen=False)
 class _FontCache:
     ever_loaded: bool = False
@@ -89,6 +97,7 @@ class _FontCache:
     files: tuple[Path, ...] = ()
     per_file: dict[str, tuple[Path, ...]] = {}
     font_cache: tuple["_FontStruct", ...] = ()
+    alias_cache: dict[str, _FontAlias] = {}
     default_sans: Optional["_FontStruct"] = None
     default_serif: Optional["_FontStruct"] = None
     default_monospace: Optional["_FontStruct"] = None
@@ -199,6 +208,60 @@ class _FontCache:
         if not cls.ever_loaded:
             cls.ever_loaded = True
 
+    @classmethod
+    def get_struct_from_tk_name(cls, name: str) -> _FontStruct:
+        if not cls.ever_loaded:
+            cls.refresh_cache()
+        _tk_font = tk_font.nametofont(name)
+        for struct in cls.font_cache:
+            if struct.family != _tk_font["family"]:
+                continue
+            if (
+                _tk_font["weight"] == "bold"
+                and "bold" not in struct.sub_family
+                or "semibold" not in struct.sub_family
+            ):
+                continue
+            if _tk_font["slant"] == "roman" and "italic" not in struct.sub_family:
+                continue
+            return struct
+        raise KeyError(name)
+
+    @classmethod
+    def def_tk_font_name_from_font_dict(cls, name: str, font_dict: Font):
+        if not cls.ever_loaded:
+            cls.refresh_cache()
+        if TYPE_CHECKING:
+            assert "family" in font_dict
+            assert "size" in font_dict
+
+        tk_object = tk_font.Font(
+            exists=name in tk_font.names(),
+            root=None,
+            name=name,
+            family=font_dict["family"],
+            size=int(font_dict["size"][0]),
+            weight="bold"
+            if font_dict.get("weight", "normal") != "normal"
+            else "normal",
+            slant="italic" if font_dict.get("italic", False) else "roman",
+            underline=font_dict.get("underline", False),
+            overstrike=font_dict.get("strikethrough", False),
+        )
+
+        cls.alias_cache[name] = _FontAlias(
+            name=name,
+            font_struct=cls.get_struct_from_tk_name(name),
+            font_dict=font_dict,
+            font_tk_object=tk_object,
+        )
+
+    @classmethod
+    def tk_font_name_exists(cls, name: str) -> bool:
+        if not cls.ever_loaded:
+            cls.refresh_cache()
+        return name in tk_font.names()
+
 
 @dataclass(init=True, frozen=True, unsafe_hash=True)
 class _FontStruct:
@@ -270,7 +333,30 @@ class Font(TypedDict, total=False):
 
     @classmethod
     def create_font_as_config_alias(cls, new_alias: str, font_config: Font):  # type: ignore[reportGeneralTypeIssues]
-        ...
+        _internal_name = f"simple_tkinter.{new_alias}"
+        if _FontCache.tk_font_name_exists(_internal_name):
+            raise ValueError("font alias already exists")
+        _FontCache.def_tk_font_name_from_font_dict(new_alias, font_config)
+
+    @classmethod
+    def get_aliases(cls) -> tuple[str, ...]:  # type: ignore[reportGeneralTypeIssues]
+        return tuple(
+            alias.name.removeprefix("simple_tkinter.")
+            for alias in _FontCache.alias_cache.values()
+        )
+
+    @classmethod
+    def get_alias_font(cls, alias: str) -> Font:  # type: ignore[reportGeneralTypeIssues]
+        _internal_name = f"simple_tkinter.{alias}"
+        _font_struct = _FontCache.get_struct_from_tk_name(_internal_name)
+        _tk_font = tk_font.nametofont(_internal_name)
+        font_dict = _font_struct.get_default_font_dict()
+        font_dict.update(
+            size=SizeAbsolute(_tk_font["size"], "pt"),
+            underline=bool(_tk_font["underline"]),
+            strikethrough=bool(_tk_font["overstrike"]),
+        )
+        return font_dict
 
     @classmethod
     def refresh_cache(cls):  # type: ignore[reportGeneralTypeIssues]
