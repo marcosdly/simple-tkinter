@@ -17,6 +17,7 @@ import itertools
 import tkinter.font as tk_font
 
 from typing import (
+    TYPE_CHECKING,
     Any,
     Final,
     Union,
@@ -84,7 +85,9 @@ PropertyType = Union[
 class _FontCache:
     ever_loaded: bool = False
     families_unique: tuple[str, ...] = ()
+    per_family: dict[str, tuple[tuple[str, ...], ...]] = {}
     files: tuple[Path, ...] = ()
+    per_file: dict[str, tuple[Path, ...]] = {}
     font_cache: tuple["_FontStruct", ...] = ()
     default_sans: Optional["_FontStruct"] = None
     default_serif: Optional["_FontStruct"] = None
@@ -151,6 +154,44 @@ class _FontCache:
             ):
                 cls.default_monospace = font_struct
 
+        _family: str
+        if cls.default_sans is None:
+            _family = tk_font.nametofont("TkDefaultFont")["family"]
+            try:
+                cls.default_sans = next(
+                    struct for struct in _fonts if struct.family == _family
+                )
+            except StopIteration:
+                pass
+        if cls.default_monospace is None:
+            _family = tk_font.nametofont("TkFixedFont")["family"]
+            for struct in _fonts:
+                if struct.family == _family:
+                    cls.default_sans = struct
+        if cls.default_serif is None:
+            _family = tk_font.nametofont("ansi")["family"]
+            for struct in _fonts:
+                if struct.family == _family:
+                    cls.default_sans = struct
+
+        per_family: dict[str, set[tuple[str, ...]]] = {}
+        for struct in _fonts:
+            if struct.family not in per_family:
+                per_family[struct.family] = set()
+            per_family[struct.family].add(struct.sub_family)
+        cls.per_family = {
+            family: tuple(sub_family) for family, sub_family in per_family.items()
+        }
+
+        per_file: dict[str, set[Path]] = {}
+        for struct in _fonts:
+            if struct.family not in per_file:
+                per_file[struct.family] = set()
+            per_file[struct.family].add(struct.file)
+        cls.per_file = {
+            family: tuple(all_files) for family, all_files in per_file.items()
+        }
+
         cls.families_unique = tuple(_families)
         cls.files = tuple(files)
         cls.font_cache = tuple(_fonts)
@@ -194,23 +235,38 @@ class Font(TypedDict, total=False):
 
     @classmethod
     def get_standard_font(cls, alias: Literal["sans", "serif", "monospace"]) -> Font:  # type: ignore[reportGeneralTypeIssues]
-        ...
+        if TYPE_CHECKING:
+            assert _FontCache.default_sans is not None
+            assert _FontCache.default_serif is not None
+            assert _FontCache.default_monospace is not None
+        if alias == "sans":
+            return _FontCache.default_sans.get_default_font_dict()
+        if alias == "serif":
+            return _FontCache.default_serif.get_default_font_dict()
+        if alias == "monospace":
+            return _FontCache.default_monospace.get_default_font_dict()
+        raise ValueError(f"unknown standard font '{alias}'")
 
     @classmethod
-    def get_families(cls) -> tuple[str, ...]:  # type: ignore[reportGeneralTypeIssues]
-        ...
+    def get_families(cls):  # type: ignore[reportGeneralTypeIssues]
+        return _FontCache.families_unique
 
     @classmethod
-    def get_sub_families(cls) -> dict[str, tuple[str, ...]]:  # type: ignore[reportGeneralTypeIssues]
-        ...
+    def get_sub_families(cls):  # type: ignore[reportGeneralTypeIssues]
+        return _FontCache.per_family
 
     @classmethod
-    def get_files(cls) -> dict[str, Path]:  # type: ignore[reportGeneralTypeIssues]
-        ...
+    def get_files(cls):  # type: ignore[reportGeneralTypeIssues]
+        return copy.deepcopy(_FontCache.per_file)
 
     @classmethod
     def get_by_name(cls, font_name: str) -> Font:  # type: ignore[reportGeneralTypeIssues]
-        ...
+        try:
+            return next(
+                struct for struct in _FontCache.font_cache if struct.family == font_name
+            ).get_default_font_dict()
+        except StopIteration as err:
+            raise KeyError(err)
 
     @classmethod
     def create_font_as_config_alias(cls, new_alias: str, font_config: Font):  # type: ignore[reportGeneralTypeIssues]
