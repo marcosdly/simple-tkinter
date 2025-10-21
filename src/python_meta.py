@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import inspect
-
-from typing import TYPE_CHECKING, Generic, TypeVar, Callable, cast, final
+from queue import Queue
+from typing import TYPE_CHECKING, Generic, TypeVar, Callable, Generator, cast
 
 
 _T = TypeVar("_T")
@@ -87,3 +86,16 @@ class single_eval_cached_property(Generic[_T, _V]):
         raise AttributeError("This property is read-only") from MetaProgrammingError(
             f"Attempted to re-assign read-only property '{self.name}' of class '{self.owner.__name__}'"
         )
+
+
+def deep_dict_iter_without_recursion(
+    d: dict[_T, _V],
+) -> Generator[tuple[_T, _V, bool], None, None]:
+    dict_queue = Queue[dict[_T, _V]]()
+    dict_queue.put(d)
+    while dict_queue.empty() is False:
+        for key, value in dict_queue.get().items():
+            is_dict = isinstance(value, dict)
+            yield key, value, is_dict
+            if is_dict:
+                dict_queue.put(cast(dict[_T, _V], value))
