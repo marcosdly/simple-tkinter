@@ -53,6 +53,8 @@ class WithStyle:
             _hash = 0
         else:
             _hash = hash(tuple(sorted(style.values(), key=str)))
+        if _hash == self.__style_curr_hash:
+            return
         self.__style_prev_hash = self.__style_curr_hash
         self.__style_curr_hash = _hash
 
