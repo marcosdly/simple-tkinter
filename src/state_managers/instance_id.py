@@ -1,5 +1,11 @@
 from typing import Any
 
+__all__ = [
+    "is_instance_registered",
+    "get_registered_instance_id",
+    "register_instance_id",
+]
+
 
 _REGISTRY: dict[int, int] = {}
 """Registry mapping instance memory ids to unique object references."""
