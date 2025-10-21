@@ -13,12 +13,16 @@ if TYPE_CHECKING:
 
 
 class Window:
+    id: int
     tcltk: "TclTk"
     is_root: bool
     _toplevel: tk.Toplevel | None
 
     def __new__(cls, tcltk: TclTk):
         self = super().__new__(cls)
+        self.id = py.read_only_attribute(
+            state_managers.instance_id.register_instance_id(self)
+        )
         self.tcltk = py.read_only_attribute(tcltk)
         toplevel = tcltk.tk.winfo_toplevel()
         self._toplevel = py.read_only_attribute(assign_later=True)
