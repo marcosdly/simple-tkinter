@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import src.python_meta as py
+
 from typing import Any
 
 
@@ -21,7 +23,7 @@ _REGISTRY_WINDOW2WIDGET_COUNT: dict[int, int] = {}
 
 IdHierarchy = dict[int, "IdHierarchy|None"]
 
-_REGISTRY_ID_HIERARCHY: IdHierarchy = {}  # TODO Implement
+_REGISTRY_ID_HIERARCHY: IdHierarchy = {}
 """Registry mapping instance ids to their hierarchical structure a.k.a children."""
 
 _WINDOW_ID_COUNTER: int = 0
@@ -62,9 +64,18 @@ def _check_instance_type(instance: Any) -> None:
         raise TypeError("Instance must be of type Widget or Window")
 
 
+def _extract_bits(value: int, offset: int, length: int) -> int:
+    mask = (1 << length) - 1
+    return (value >> offset) & mask
+
+
 def _get_window_id_from_instance_id(instance_id: int) -> int:
     # Clear the lower N bits to get the Window id
-    return instance_id & ~((1 << _BIT_OFFSET) - 1)
+    return _extract_bits(instance_id, _BIT_OFFSET, _BIT_OFFSET)
+
+
+def _is_id_a_window_id(instance_id: int) -> bool:
+    return _extract_bits(instance_id, 0, _BIT_OFFSET) == 0
 
 
 def is_instance_registered(instance: object) -> bool:
@@ -114,11 +125,16 @@ def register_instance_id(instance: object) -> int:
         _REGISTRY_ADDR2ID[memory_id] = window_id
         _REGISTRY_WINDOW2WIDGET_COUNT[window_id] = 0
         _REGISTRY_ID2REF[window_id] = instance
+        _REGISTRY_ID_HIERARCHY[window_id] = None
 
     elif isinstance(instance, Widget):
         parent_id = _REGISTRY_ADDR2ID.get(id(instance.parent), None)
         if parent_id is None:
             raise ValueError("Widget instance's parent has no registered id")
+        if parent_id not in _REGISTRY_ID_HIERARCHY:
+            raise ValueError(
+                "Widget instance's parent has no registered hierarchy entry"
+            )
         window_id = _get_window_id_from_instance_id(parent_id)
         current_widget_count = _REGISTRY_WINDOW2WIDGET_COUNT.get(window_id, None)
         if current_widget_count is None:
@@ -129,5 +145,106 @@ def register_instance_id(instance: object) -> int:
         _REGISTRY_WINDOW2WIDGET_COUNT[window_id] += 1
         _REGISTRY_ADDR2ID[memory_id] = widget_id
         _REGISTRY_ID2REF[widget_id] = instance
+        hierarchy_entry = _REGISTRY_ID_HIERARCHY[parent_id]
+        if hierarchy_entry is None:
+            _REGISTRY_ID_HIERARCHY[parent_id] = {widget_id: None}
+        else:
+            hierarchy_entry[widget_id] = None
 
     return _REGISTRY_ADDR2ID[memory_id]
+
+
+class Mixin_WithInstanceIdHierarchy:
+    """Mixin class to add hierarchical id management capabilities to widgets and
+    alike.
+    """
+
+    id: int
+
+    def __new__(cls, *args, **kwargs):
+        self = super().__new__(cls, *args, **kwargs)
+        try:
+            self.id = py.read_only_attribute(register_instance_id(self))
+        except KeyError as e:
+            raise RuntimeError(
+                "Failed to register instance id in the internal hierarchy system"
+            ) from e
+        return self
+
+    def __eq__(self, value):
+        return isinstance(value, Mixin_WithInstanceIdHierarchy) and self.id == value.id
+
+    def __ne__(self, value):
+        return not self.__eq__(value)
+
+    def __lt__(self, value):
+        if not isinstance(value, Mixin_WithInstanceIdHierarchy):
+            return NotImplemented
+        return self.id < value.id
+
+    def __gt__(self, value):
+        if not isinstance(value, Mixin_WithInstanceIdHierarchy):
+            return NotImplemented
+        return self.id > value.id
+
+    def __le__(self, value):
+        if not isinstance(value, Mixin_WithInstanceIdHierarchy):
+            return NotImplemented
+        return self.id <= value.id
+
+    def __ge__(self, value):
+        if not isinstance(value, Mixin_WithInstanceIdHierarchy):
+            return NotImplemented
+        return self.id >= value.id
+
+    def __contains__(self, item):
+        if not isinstance(item, Mixin_WithInstanceIdHierarchy):
+            raise TypeError("Impossible for object of this type to be contained")
+        if _is_id_a_window_id(self.id):
+            # NOTE: Windows cannot contain other Windows
+            return False
+        for instance_id, _, _ in py.deep_dict_iter_without_recursion(
+            _REGISTRY_ID_HIERARCHY
+        ):
+            if instance_id == item.id:
+                return True
+        return False
+
+    def __len__(self) -> int:
+        tree = None
+        if _is_id_a_window_id(self.id):
+            tree = _REGISTRY_ID_HIERARCHY.get(self.id, None)
+        else:
+            for instance_id, subtree, _ in py.deep_dict_iter_without_recursion(
+                _REGISTRY_ID_HIERARCHY
+            ):
+                if instance_id == self.id:
+                    tree = subtree
+                    break
+        if tree is None:
+            return 0
+        count = 0
+        for _, _, is_dict in py.deep_dict_iter_without_recursion(tree):
+            if not is_dict:
+                count += 1
+        return count
+
+    def __iter__(self):
+        if _is_id_a_window_id(self.id):
+            tree = _REGISTRY_ID_HIERARCHY.get(self.id, None)
+        else:
+            tree = None
+            for instance_id, subtree, _ in py.deep_dict_iter_without_recursion(
+                _REGISTRY_ID_HIERARCHY
+            ):
+                if instance_id == self.id:
+                    tree = subtree
+                    break
+        if tree is None:
+            return
+        for instance_id, _, is_dict in py.deep_dict_iter_without_recursion(tree):
+            if not is_dict:
+                yield _REGISTRY_ID2REF[instance_id]
+
+    def __index__(self) -> int:
+        return self.id
