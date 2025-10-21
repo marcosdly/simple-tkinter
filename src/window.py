@@ -1,17 +1,22 @@
 from __future__ import annotations
 import tkinter as tk
 import python_meta as py
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from tcltk import TclTk
 
 
 class Window:
-    tk: tk.Tk
+    tcltk: "TclTk"
     is_root: bool
     _toplevel: tk.Toplevel | None
 
-    def __new__(cls, _tk: tk.Tk):
+    def __new__(cls, tcltk: TclTk):
         self = super().__new__(cls)
-        self.tk = py.read_only_attribute(_tk)
-        toplevel = _tk.winfo_toplevel()
+        self.tcltk = py.read_only_attribute(tcltk)
+        toplevel = tcltk.tk.winfo_toplevel()
         self._toplevel = py.read_only_attribute(assign_later=True)
         self.is_root = py.read_only_attribute(assign_later=True)
         if isinstance(toplevel, tk.Tk):

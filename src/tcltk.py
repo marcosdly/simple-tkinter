@@ -73,7 +73,7 @@ class TclTk:
     @py.single_eval_cached_property
     def master_window(self) -> Window:
         if _TK_MASTER_WINDOW.get() is None:
-            _TK_MASTER_WINDOW.set(Window(TclTk.root_interpreter.tk))
+            _TK_MASTER_WINDOW.set(Window(TclTk.root_interpreter))
         return cast(Window, _TK_MASTER_WINDOW.get())
 
     def tick(self):
