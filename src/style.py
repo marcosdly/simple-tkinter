@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 from queue import Queue
-from typing import ClassVar, TypedDict, Union
+from typing import Union, ClassVar, TypedDict
 
 
 STYLE_UPDATE_QUEUE = Queue()
@@ -40,7 +41,13 @@ class WithStyle:
         return super().__getattribute__(name)
 
     def __check_and_update_style_hash(self) -> None:
-        """Compute hash of the style dictionary. If the has changed since last call, update the previous and current hash attributes."""
+        """
+        Compute hash of the style dictionary.
+
+        If the has changed since last call, update the previous and current hash
+        attributes.
+
+        """
         style = getattr(self, "__style", None)
         if style is None or len(style) == 0:
             _hash = 0

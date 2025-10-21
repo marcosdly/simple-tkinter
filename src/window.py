@@ -1,6 +1,10 @@
 from __future__ import annotations
-import tkinter as tk
+
 import python_meta as py
+import state_managers
+
+import tkinter as tk
+
 from typing import TYPE_CHECKING
 
 

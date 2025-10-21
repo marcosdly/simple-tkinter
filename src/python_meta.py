@@ -1,5 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Callable, Generic, TypeVar, cast
+
+import inspect
+
+from typing import TYPE_CHECKING, Generic, TypeVar, Callable, cast, final
+
 
 _T = TypeVar("_T")
 _V = TypeVar("_V")
@@ -45,8 +49,12 @@ class read_only_attribute(Generic[_V]):
 
 
 class single_eval_cached_property(Generic[_T, _V]):
-    """Class attribute that wraps a function to be evaluated only once upon first access.
-    The consumer is only exposed to the returned value."""
+    """
+    Class attribute that wraps a function to be evaluated only once upon first access.
+
+    The consumer is only exposed to the returned value.
+
+    """
 
     if TYPE_CHECKING:
 

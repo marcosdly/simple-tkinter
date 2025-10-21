@@ -1,11 +1,15 @@
 from __future__ import annotations
-from contextvars import ContextVar
-import tkinter as tk
-from tkinter import ttk
+
 import python_meta as py
-from typing import cast, Callable
 
 from window import Window
+
+import tkinter as tk
+
+from typing import Callable, cast
+from tkinter import ttk
+from contextvars import ContextVar
+
 
 _TCL_ROOT_INTERPRETER: ContextVar[TclTk | None] = ContextVar(
     "_TCL_ROOT_INTERPRETER", default=None
