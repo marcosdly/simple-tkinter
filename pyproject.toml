@@ -60,3 +60,15 @@ section-order = [
 
 [tool.ruff.lint.isort.sections]
 testing = ["pytest"]
+
+[tool.docformatter]
+style = "sphinx"
+in-place = true
+wrap-summaries = 88
+wrap-descriptions = 88
+force-wrap = true
+blank = true
+pre-summary-newline = true
+pre-summary-space = false
+# make-summary-multi-line = false
+close-quotes-on-newline = true
