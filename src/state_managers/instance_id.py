@@ -11,7 +11,13 @@ _REGISTRY: dict[int, int] = {}
 """Registry mapping instance memory ids to unique object references."""
 
 _WINDOW_ID_COUNTER: int = 0
-"""Counter for assigning unique Window ids. Not to be in any way related to: the number of Windows registered, the order of registration, it's position in the children hierarchy."""
+"""
+Counter for assigning unique Window ids.
+
+Not to be in any way related to: the number of Windows registered, the order of
+registration, it's position in the children hierarchy.
+
+"""
 
 _BIT_OFFSET = 32
 
@@ -31,7 +37,12 @@ def is_instance_registered(instance: object) -> bool:
 
 
 def get_registered_instance_id(instance: object) -> int:
-    """Get the registered unique identifier for the given instance. Raises KeyError if the instance is not registered."""
+    """
+    Get the registered unique identifier for the given instance.
+
+    Raises KeyError if the instance is not registered.
+
+    """
     _check_instance_type(instance)
     memory_id = id(instance)
     if memory_id not in _REGISTRY:
@@ -40,7 +51,16 @@ def get_registered_instance_id(instance: object) -> int:
 
 
 def register_instance_id(instance: object) -> int:
-    """Get a unique identifier for the given instance. Ids are arbitrary sized ints where each 32bits are an individual identifier to an object instance. For example, the first 32 bits are the Widget id of a specific Window, and the next 32 bits are the Window id of that Widget. This allows for easy hierarchical identification of instances, is cheap on storage and allows reference access through a simple hashmaps access."""
+    """
+    Get a unique identifier for the given instance.
+
+    Ids are arbitrary sized ints where each 32bits are an individual identifier to an
+    object instance. For example, the first 32 bits are the Widget id of a specific
+    Window, and the next 32 bits are the Window id of that Widget. This allows for easy
+    hierarchical identification of instances, is cheap on storage and allows reference
+    access through a simple hashmaps access.
+
+    """
     from src.widget import Widget
     from src.window import Window
 
