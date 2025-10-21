@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import python_meta as py
+import src.python_meta as py
 
-from window import Window
+from src.window import Window
 
 import tkinter as tk
 

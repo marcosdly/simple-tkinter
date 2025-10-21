@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import python_meta as py
-import state_managers
+import src.python_meta as py
+import src.state_managers as state_managers
 
 import tkinter as tk
 
