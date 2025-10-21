@@ -1,6 +1,19 @@
 from __future__ import annotations
 
 
+def test_bootstrapping_tcltk() -> None:
+    from src.tcltk import TclTk
+
+    tcltk = TclTk()
+    assert tcltk is TclTk.root_interpreter
+    assert tcltk.root_style_db
+    assert tcltk.master_window
+    FPS = 60
+    # Simulate ticking for 10 seconds
+    for _ in range(FPS * 10):
+        tcltk.tick()
+
+
 def test_instance_id_registry() -> None:
     from src.tcltk import TclTk
     from src.widget import Widget
