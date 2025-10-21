@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from queue import Queue
+from src.state_managers.instance_id import Mixin_WithInstanceIdHierarchy
+
+from queue import PriorityQueue
 from typing import Union, ClassVar, TypedDict
 
 
-STYLE_UPDATE_QUEUE = Queue()
+STYLE_UPDATE_QUEUE: PriorityQueue[Mixin_WithInstanceIdHierarchy] = PriorityQueue()
 
 
 _StyleValueType = Union[int, float, str, bool, tuple, list, dict]
@@ -16,7 +18,7 @@ class _StyleAnnotation(TypedDict):
     default: _StyleValueType | None
 
 
-class WithStyle:
+class WithStyle(Mixin_WithInstanceIdHierarchy):
     """Mixin class to add style management capabilities to widgets."""
 
     __style_annotations__: ClassVar[dict[str, _StyleAnnotation]] | None = None
