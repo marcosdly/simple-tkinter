@@ -8,6 +8,7 @@ import tkinter as tk
 
 from typing import Callable, cast
 from tkinter import ttk
+from functools import cache
 from contextvars import ContextVar
 
 
@@ -22,63 +23,66 @@ _TK_MASTER_WINDOW: ContextVar[Window | None] = ContextVar(
 )
 
 
+def _get_default_root() -> tk.Tk:
+    """Get the default root Tk instance using tkinter internal utility."""
+    # Internal library utility to access default root Tk instance
+    # NOTE: Can be suppressed by calling tk.NoDefaultRoot()
+    get_default_root: Callable[[], tk.Tk] = tk._get_default_root  # pyright: ignore[reportAttributeAccessIssue]
+    try:
+        return get_default_root()
+    except RuntimeError as e:
+        raise RuntimeError("Failed to get default root Tk instance") from e
+
+
 class TclTk:
     """God object for the Tcl/Tk interpreter."""
 
-    tk: tk.Tk
     is_root: bool
-
-    def _get_default_root(self) -> tk.Tk:
-        """Get the default root Tk instance using tkinter internal utility."""
-        # Internal library utility to access default root Tk instance
-        # NOTE: Can be suppressed by calling tk.NoDefaultRoot()
-        get_default_root: Callable[[], tk.Tk] = tk._get_default_root  # pyright: ignore[reportAttributeAccessIssue]
-        try:
-            return get_default_root()
-        except RuntimeError as e:
-            raise RuntimeError("Failed to get default root Tk instance") from e
 
     def __new__(cls):
         self = super().__new__(cls)
-        is_root: bool = False
         if _TCL_ROOT_INTERPRETER.get() is None:
             # First instance created becomes the root interpreter
-            is_root = True
             _TCL_ROOT_INTERPRETER.set(self)
-        self.is_root = py.read_only_attribute(is_root)
+        self.is_root = _TCL_ROOT_INTERPRETER.get() is self
         return self
 
-    @py.single_eval_cached_property
+    @property
+    @cache
     def tk(self) -> tk.Tk:
         if self.is_root:
-            return self._get_default_root()
+            return _get_default_root()
         return tk.Tk()
 
-    @py.single_eval_cached_property
     @classmethod
-    def root_interpreter(cls) -> TclTk:
-        if _TCL_ROOT_INTERPRETER.get() is None:
+    def get_master_interpreter(cls) -> TclTk:
+        interpreter = _TCL_ROOT_INTERPRETER.get()
+        if interpreter is None:
             # First instance created becomes the root interpreter
             _ = cls()
-        return cast(TclTk, _TCL_ROOT_INTERPRETER.get())
+        return cast(TclTk, interpreter)
 
-    @py.single_eval_cached_property
-    def root_style_db(self) -> ttk.Style:
+    @classmethod
+    def get_master_style_db(cls) -> ttk.Style:
         # Creating a style DB will create a window if none exists yet
         # Make sure there's a master window first
-        window = self.master_window
-        if _TTK_ROOT_STYLE_DB.get() is None:
+        window = cls.get_master_window()
+        s = _TTK_ROOT_STYLE_DB.get()
+        if s is None:
             # NOTE: master=None falls back to the same default root returned
             # by self._get_default_root()
-            toplevel: tk.Toplevel | None = window._toplevel
-            _TTK_ROOT_STYLE_DB.set(ttk.Style(master=toplevel))
-        return cast(ttk.Style, _TTK_ROOT_STYLE_DB.get())
+            toplevel: tk.Toplevel | None = window.toplevel
+            s = ttk.Style(master=toplevel)
+            _TTK_ROOT_STYLE_DB.set(s)
+        return cast(ttk.Style, s)
 
-    @py.single_eval_cached_property
-    def master_window(self) -> Window:
-        if _TK_MASTER_WINDOW.get() is None:
-            _TK_MASTER_WINDOW.set(Window(TclTk.root_interpreter))
-        return cast(Window, _TK_MASTER_WINDOW.get())
+    @classmethod
+    def get_master_window(cls) -> Window:
+        window = _TK_MASTER_WINDOW.get()
+        if window is None:
+            window = Window(cls.get_master_interpreter())
+            _TK_MASTER_WINDOW.set(window)
+        return cast(Window, window)
 
     def tick(self):
         self.tk.update_idletasks()

@@ -14,20 +14,14 @@ if TYPE_CHECKING:
 
 
 class Window(Mixin_WithInstanceIdHierarchy):
+    toplevel: tk.Toplevel | None
     tcltk: "TclTk"
     is_root: bool
-    _toplevel: tk.Toplevel | None
 
-    def __new__(cls, tcltk: TclTk):
+    def __new__(cls, tcltk: "TclTk"):
         self = super().__new__(cls)
-        self.tcltk = py.read_only_attribute(tcltk)
+        self.tcltk = tcltk
         toplevel = tcltk.tk.winfo_toplevel()
-        self._toplevel = py.read_only_attribute(assign_later=True)
-        self.is_root = py.read_only_attribute(assign_later=True)
-        if isinstance(toplevel, tk.Tk):
-            self._toplevel = None
-            self.is_root = True
-        else:
-            self._toplevel = toplevel
-            self.is_root = False
+        self.toplevel = toplevel if isinstance(toplevel, tk.Toplevel) else None
+        self.is_root = self.toplevel is None
         return self

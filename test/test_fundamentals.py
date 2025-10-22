@@ -5,9 +5,9 @@ def test_bootstrapping_tcltk() -> None:
     from src.tcltk import TclTk
 
     tcltk = TclTk()
-    assert tcltk is TclTk.root_interpreter
-    assert tcltk.root_style_db
-    assert tcltk.master_window
+    assert tcltk is TclTk.get_master_interpreter()
+    assert TclTk.get_master_style_db()
+    assert TclTk.get_master_window()
     FPS = 60
     # Simulate ticking for 10 seconds
     for _ in range(FPS * 10):
