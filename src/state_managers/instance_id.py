@@ -71,7 +71,7 @@ def _extract_bits(value: int, offset: int, length: int) -> int:
 
 def _get_window_id_from_instance_id(instance_id: int) -> int:
     # Clear the lower N bits to get the Window id
-    return _extract_bits(instance_id, _BIT_OFFSET, _BIT_OFFSET)
+    return instance_id & ~((1 << _BIT_OFFSET) - 1)
 
 
 def _is_id_a_window_id(instance_id: int) -> bool:
