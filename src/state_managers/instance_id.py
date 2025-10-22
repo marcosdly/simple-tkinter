@@ -164,7 +164,7 @@ class Mixin_WithInstanceIdHierarchy:
     def __new__(cls, *args, **kwargs):
         self = super().__new__(cls, *args, **kwargs)
         try:
-            self.id = py.read_only_attribute(register_instance_id(self))
+            self.id = register_instance_id(self)
         except KeyError as e:
             raise RuntimeError(
                 "Failed to register instance id in the internal hierarchy system"
@@ -210,24 +210,37 @@ class Mixin_WithInstanceIdHierarchy:
                 return True
         return False
 
-    def __len__(self) -> int:
-        tree = None
-        if _is_id_a_window_id(self.id):
-            tree = _REGISTRY_ID_HIERARCHY.get(self.id, None)
-        else:
-            for instance_id, subtree, _ in py.deep_dict_iter_without_recursion(
-                _REGISTRY_ID_HIERARCHY
-            ):
-                if instance_id == self.id:
-                    tree = subtree
-                    break
-        if tree is None:
-            return 0
-        count = 0
-        for _, _, is_dict in py.deep_dict_iter_without_recursion(tree):
-            if not is_dict:
-                count += 1
-        return count
+    # region TclTk.get_master_window() bug
+
+    # FIXME: Calling TclTk.get_master_window() calls this method right at the return statement
+    #  and returns this method's value instead ????? Why???
+    # FIXME: Uncommenting this causes test failures
+
+    # def __len__(self) -> int:
+    #     tree = None
+    #     if _is_id_a_window_id(self.id):
+    #         tree = _REGISTRY_ID_HIERARCHY.get(self.id, None)
+    #     else:
+    #         for instance_id, subtree, _ in py.deep_dict_iter_without_recursion(
+    #             _REGISTRY_ID_HIERARCHY
+    #         ):
+    #             if instance_id == self.id:
+    #                 tree = subtree
+    #                 break
+    #     if tree is None:
+    #         return 0
+    #     count = 0
+    #     for _, _, is_dict in py.deep_dict_iter_without_recursion(tree):
+    #         if not is_dict:
+    #             count += 1
+    #     return count
+
+    # This would be a better implementation of __len__, thought it doesn't matter. The bug is consistent.
+
+    # def __len__(self) -> int:
+    #     return sum(1 for _ in self.__iter__())
+
+    # endregion TclTk.get_master_window() bug
 
     def __iter__(self):
         if _is_id_a_window_id(self.id):
