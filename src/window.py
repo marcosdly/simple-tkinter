@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import src.python_meta as py
-import src.state_managers as state_managers
+
+from src.state_managers.instance_id import Mixin_WithInstanceIdHierarchy
 
 import tkinter as tk
 
@@ -12,17 +13,13 @@ if TYPE_CHECKING:
     from tcltk import TclTk
 
 
-class Window:
-    id: int
+class Window(Mixin_WithInstanceIdHierarchy):
     tcltk: "TclTk"
     is_root: bool
     _toplevel: tk.Toplevel | None
 
     def __new__(cls, tcltk: TclTk):
         self = super().__new__(cls)
-        self.id = py.read_only_attribute(
-            state_managers.instance_id.register_instance_id(self)
-        )
         self.tcltk = py.read_only_attribute(tcltk)
         toplevel = tcltk.tk.winfo_toplevel()
         self._toplevel = py.read_only_attribute(assign_later=True)
