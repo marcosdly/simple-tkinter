@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import src.python_meta as py
-
 import tkinter as tk
 
 from typing import TYPE_CHECKING, Any, Union, Callable, Iterable, Generator, TypedDict
@@ -25,10 +23,8 @@ class _StyleDefinitionState(TypedDict, total=False):
     widget: WidgetLike
 
 
-StyleApplyFunc = Union[
-    Callable[[Union[tk.Widget, ttk.Widget], "StyleValueType", "StyleValueType"], None],
-    Callable[[Union[tk.Widget, ttk.Widget], "StyleValueType"], None],
-    Callable[[Union[tk.Widget, ttk.Widget]], None],
+StyleApplyFunc = Callable[
+    [Union[tk.Widget, ttk.Widget], "StyleValueType", "StyleValueType"], None
 ]
 
 StyleValueFactory = Callable[[], "StyleValueType"]
@@ -37,30 +33,8 @@ StyleValueType = Union[int, float, str, bool, tuple[Any], list[Any], dict[str, A
 
 
 class StyleApplyError(RuntimeError):
-    """
-    Exception raised when a style apply function fails.
-
-    Style apply functions are internal in the sense they are (or should be) declared at
-    class instanciation or init.
-
-    It is a RuntimeError due to it being considered core behavior. For a less formal way
-    of reacting to style changes, consider using event bindings.
-
-    Multiple error checks may occur in the contexts this exception is raised and the
-    property `errors` contains them all for debugging purposes.
-
-    There is no 'master' or 'root' error, as this exception represents a context, like
-    an explicit wrapper/flag for the context of applying styles.
-
-    """
-
-    name: str
-    errors: tuple[Exception, ...]
-
-    def __init__(self, *, name: str, error_chain: Iterable[Exception] = ()) -> None:
+    def __init__(self, *, name: str) -> None:
         super().__init__(f"Style apply function '{name}'")
-        self.name = name
-        self.errors = tuple(error_chain)
 
 
 def hash_style_value(v: StyleValueType | StyleValueFactory) -> int:
@@ -107,27 +81,13 @@ class Mixin_WithStyle:
                     widget.config(bg=value)
 
         >>> my_widget = MyWidget(some_tk_widget)
+        >>> my_widget["bg_color"]
+        'white'
         >>> my_widget["bg_color"] = "#AABBCC"
+        >>> my_widget["bg_color"]
+        '#AABBCC'
 
-    Amount of parameters in the apply function may vary (1 to 3), depending on what
-    information is needed.
-
-    The order of parameters is always: `widget`, `value`, `previous_value`. For example:
-
-    .. code:: python
-        @define_style("some_stateless_style", int, default=0)
-        def apply(widget, /) -> None:
-            ...
-
-        @define_style("some_stateful_simple_style", int, default=0)
-        def apply(widget, value, /) -> None:
-            ...
-
-        @define_style("some_stateful_complex_style", int, default=0)
-        def apply(widget, value, previous_value, /) -> None:
-            ...
-
-    Styles cannot be re-defined once the class has been created, thus why the
+    Styles cannot be re-defined once the class has been instantiated, thus why the
     `_define_style_properties` abstract method exists - apart from allowing the class
     to be self contained.
 
@@ -192,7 +152,7 @@ class Mixin_WithStyle:
                 err = RuntimeError(
                     f"Getting style value for key '{key}' requires side effects to be allowed because an arbitrary factory callable must be called"
                 )
-                raise StyleApplyError(name=key, error_chain=[err])
+                raise StyleApplyError(name=key) from err
             value = value()
         if allow_self_side_effects:
             self.__style_state[key] = value
@@ -237,32 +197,13 @@ class Mixin_WithStyle:
         if TYPE_CHECKING:
             assert isinstance(widget, (tk.Widget, ttk.Widget))
 
-        # try 3 args
-        ok, err = py.pcall(apply, widget, curr, prev)
-        if ok:
+        try:
+            apply(widget, curr, prev)
             return self.__get_style_state(
                 key, allow_foreign_side_effects=True, allow_self_side_effects=True
             )
-        error_chain = []
-        error_chain.append(err)
-
-        # try 2 args
-        ok, err = py.pcall(apply, widget, curr)
-        if ok:
-            return self.__get_style_state(
-                key, allow_foreign_side_effects=True, allow_self_side_effects=True
-            )
-        error_chain.append(err)
-
-        # try 1 args
-        ok, err = py.pcall(apply, widget)
-        if ok:
-            return self.__get_style_state(
-                key, allow_foreign_side_effects=True, allow_self_side_effects=True
-            )
-        error_chain.append(err)
-
-        raise StyleApplyError(name=key, error_chain=error_chain)
+        except Exception as e:
+            raise StyleApplyError(name=key) from e
 
     def _define_style_properties(
         self,
@@ -358,12 +299,7 @@ class Mixin_WithStyle:
                 # __setitem__ not defined in superclass or key not found, so assume
                 # the consumer wanted to access a style key
                 raise KeyError(f"Style key '{key}' not found")
-        ok, err = py.pcall(self.__set_style_state, key, value)
-        if ok:
-            return
-        if TYPE_CHECKING:
-            assert isinstance(err, Exception)
-        raise err
+        self.__set_style_state(key, value)
 
 
 def test_style_mixin(tk_root, tk_tick):
@@ -374,7 +310,7 @@ def test_style_mixin(tk_root, tk_tick):
     class TestWidget(Mixin_WithStyle):
         def _define_style_properties(self, define_style: StyleDefDecorator) -> None:
             @define_style("title", str, default=before)
-            def apply_title(widget, value, /) -> None:
+            def apply_title(widget, value, _) -> None:
                 if isinstance(widget, tk.Toplevel):
                     widget.title(value)
                 else:
