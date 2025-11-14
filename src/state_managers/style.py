@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from typing import TYPE_CHECKING, Any, Union, Callable, Iterable, Generator, TypedDict
+from typing import TYPE_CHECKING, Any, Union, Callable, Generator, TypedDict
 from tkinter import ttk
 from contextlib import contextmanager
 
@@ -71,8 +71,6 @@ class Mixin_WithStyle:
 
     .. code:: python
         class MyWidget(Mixin_WithStyle):
-            style: Mixin_WithStyle
-
             def _define_style_properties(
                 self, define_style: StyleDefDecorator,
             ) -> None:
