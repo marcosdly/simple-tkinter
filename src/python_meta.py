@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from queue import Queue
-from typing import TYPE_CHECKING, Generic, TypeVar, Callable, Generator, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Callable, Generator, cast
 
 
 _T = TypeVar("_T")
@@ -99,3 +99,12 @@ def deep_dict_iter_without_recursion(
             yield key, value, is_dict
             if is_dict:
                 dict_queue.put(cast(dict[_T, _V], value))
+
+
+def pcall(
+    func: Callable[..., _T], /, *args: Any, **kwargs: Any
+) -> tuple[bool, _T | Exception]:
+    try:
+        return True, func(*args, **kwargs)
+    except Exception as e:
+        return False, e
