@@ -35,10 +35,7 @@ root = "."
 pythonVersion = "3.9"
 
 [dependency-groups]
-dev = [
-    "ipython>=8.18.1",
-    "pytest>=8.4.2",
-]
+dev = ["ipython>=8.18.1", "pytest>=8.4.2"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -78,3 +75,7 @@ pre-summary-newline = true
 pre-summary-space = false
 # make-summary-multi-line = false
 close-quotes-on-newline = true
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py", "*.py"]
+addopts = ["--tb=short"]

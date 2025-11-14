@@ -1,6 +1,6 @@
 {
   "git.autofetch": true,
-  "python.testing.pytestArgs": ["test"],
+  "python.testing.pytestArgs": ["test", "src"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "python.terminal.activateEnvInCurrentTerminal": true,
