@@ -17,7 +17,7 @@ class StyleAnnotation(TypedDict):
     default: StyleValueType | StyleValueFactory
 
 
-class _StyleDefinitionState(TypedDict, total=False):
+class StyleDefinitionState(TypedDict, total=False):
     defined: bool
     is_defining: bool
     widget: WidgetLike
@@ -56,67 +56,33 @@ def hash_style_value(v: StyleValueType | StyleValueFactory) -> int:
         raise TypeError(f"Unhashable style value type: {type(v)}")
 
 
+StyleAnnotations = dict[str, StyleAnnotation]
+
+StyleState = dict[str, Union[StyleValueType, StyleValueFactory]]
+
+StyleHashCache = dict[str, int]
+
 StyleDefDecorator = Callable[
     [str, type[StyleValueType], Union[StyleValueType, StyleValueFactory]],
     Callable[[StyleApplyFunc], StyleApplyFunc],
 ]
 
 
-class Mixin_WithStyle:
-    """
-    Standalone mixin class to add style management capabilities to widgets and widget-
-    like.
+class StyleMapping:
+    __style_annotations: StyleAnnotations
+    __style_state: StyleState
+    __style_hash: StyleHashCache
+    __style_def_state: StyleDefinitionState
 
-    Usage:
-
-    .. code:: python
-        class MyWidget(Mixin_WithStyle):
-            def _define_style_properties(
-                self, define_style: StyleDefDecorator,
-            ) -> None:
-                @define_style("bg_color", str, default="white")
-                def apply_bg_color(widget, value, previous_value, /) -> None:
-                    widget.config(bg=value)
-
-        >>> my_widget = MyWidget(some_tk_widget)
-        >>> my_widget["bg_color"]
-        'white'
-        >>> my_widget["bg_color"] = "#AABBCC"
-        >>> my_widget["bg_color"]
-        '#AABBCC'
-
-    Styles cannot be re-defined once the class has been instantiated, thus why the
-    `_define_style_properties` abstract method exists - apart from allowing the class
-    to be self contained.
-
-    """
-
-    style: Mixin_WithStyle
-
-    __style_annotations: dict[str, StyleAnnotation]
-    __style_def_state: _StyleDefinitionState
-    __style_state: dict[str, StyleValueType | StyleValueFactory]
-    __style_hash: dict[str, int]
-
-    def __new__(
-        cls,
-        /,
-        *args,
-        style_target_widget: WidgetLike,
-        **kwargs,
-    ) -> Mixin_WithStyle:
-        self = super().__new__(cls, *args, **kwargs)
+    def __init__(self, widget: WidgetLike, define_callback) -> None:
         self.__style_annotations = {}
         self.__style_state = {}
         self.__style_hash = {}
         self.__style_def_state = {}
-
         with self.__make_style_annotations_context(
-            style_target_widget
+            widget
         ) as new_style_annotation_decorator:
-            self._define_style_properties(new_style_annotation_decorator)
-
-        return self
+            define_callback(new_style_annotation_decorator)
 
     def __get_style_state(
         self,
@@ -202,11 +168,6 @@ class Mixin_WithStyle:
             )
         except Exception as e:
             raise StyleApplyError(name=key) from e
-
-    def _define_style_properties(
-        self,
-        define_style: StyleDefDecorator,
-    ) -> None: ...
 
     @contextmanager
     def __make_style_annotations_context(
@@ -300,6 +261,50 @@ class Mixin_WithStyle:
         self.__set_style_state(key, value)
 
 
+class Mixin_WithStyle:
+    """
+    Standalone mixin class to add style management capabilities to widgets and widget-
+    like.
+
+    Usage:
+
+    .. code:: python
+        class MyWidget(Mixin_WithStyle):
+            def _define_style_properties(
+                self, define_style: StyleDefDecorator,
+            ) -> None:
+                @define_style("bg_color", str, default="white")
+                def apply_bg_color(widget, value, previous_value, /) -> None:
+                    widget.config(bg=value)
+
+        >>> my_widget = MyWidget(some_tk_widget)
+        >>> my_widget["bg_color"]
+        'white'
+        >>> my_widget["bg_color"] = "#AABBCC"
+        >>> my_widget["bg_color"]
+        '#AABBCC'
+
+    Styles cannot be re-defined once the class has been instantiated, thus why the
+    `_define_style_properties` abstract method exists - apart from allowing the class
+    to be self contained.
+
+    """
+
+    style: StyleMapping
+
+    def _define_style_properties(
+        self,
+        define_style: StyleDefDecorator,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        *,
+        style_target_widget: WidgetLike,
+    ) -> None:
+        self.style = StyleMapping(style_target_widget, self._define_style_properties)
+
+
 def test_style_mixin(tk_root, tk_tick):
     toplevel = tk_root.winfo_toplevel()
     before = "lorem ipsum"
@@ -316,9 +321,9 @@ def test_style_mixin(tk_root, tk_tick):
 
     test_widget = TestWidget(style_target_widget=toplevel)
     tk_tick()
-    assert test_widget["title"] == before, "pre-action: custom getter failed"
+    assert test_widget.style["title"] == before, "pre-action: custom getter failed"
     assert toplevel.title() == before, "pre-action: wrapped widget state unchanged"
-    test_widget["title"] = after
+    test_widget.style["title"] = after
     tk_tick()
-    assert test_widget["title"] == after, "post-action: custom getter failed"
+    assert test_widget.style["title"] == after, "post-action: custom getter failed"
     assert toplevel.title() == after, "post-action: wrapped widget state unchanged"
